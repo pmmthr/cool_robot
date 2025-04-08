@@ -20,7 +20,7 @@ entrance = pygame.Rect(50, 250, 10, 100)
 finish = pygame.Rect(730, 250, 10, 100)
 
 
-def get_sensor_values(robot_x, robot_y, robot_angle, maze_walls):
+def get_sensor_values(robot_x, robot_y, maze_walls):
     
     distances = []
     for angle_offset in angle_offsets:
@@ -62,7 +62,7 @@ while running:
     pygame.draw.line(screen, BLACK, (int(robot_x), int(robot_y)), (int(line_x), int(line_y)), 3)
 
     # Sensor values
-    sensor_values = get_sensor_values(robot_x, robot_y, robot_angle, maze_walls)
+    sensor_values = get_sensor_values(robot_x, robot_y, maze_walls)
     font = pygame.font.SysFont(None, 18)
     for i, value in enumerate(sensor_values):
         text = font.render(str(value), True, BLACK)
@@ -96,7 +96,7 @@ while running:
 
     if robot_trace[-1] != (robot_x, robot_y):
         robot_trace.append((robot_x, robot_y))
-    if len(robot_trace) > 500:  # Limit the trace length
+    if len(robot_trace) > MAX_HISTORY_SIZE:  # Limit the trace length
         robot_trace.pop(0)
 
     # Checking for finish
