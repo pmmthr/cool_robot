@@ -4,6 +4,7 @@ WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 RED = (255, 0, 0)
 ORANGE = (255, 100, 0)
+ORANGE_LIGHT = (255, 219, 187)
 BLUE = (0, 0, 255)
 
 robot_radius = 20

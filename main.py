@@ -34,6 +34,7 @@ def get_sensor_values(robot_x, robot_y, robot_angle, maze_walls):
             distances.append(MAX_SENSOR_RANGE)  
     return distances
 
+robot_trace = [(robot_x, robot_y)]  
 
 running = True
 clock = pygame.time.Clock()
@@ -48,6 +49,10 @@ while running:
         pygame.draw.rect(screen, BLACK, wall)
     pygame.draw.rect(screen, BLUE, entrance)
     pygame.draw.rect(screen, RED, finish)
+
+    # Draw robot trace
+    for trace_x, trace_y in robot_trace:
+        pygame.draw.circle(screen, ORANGE_LIGHT, (int(trace_x), int(trace_y)), 2)
 
     # Robot drawing
     pygame.draw.circle(screen, ORANGE, (int(robot_x), int(robot_y)), robot_radius)
@@ -83,6 +88,11 @@ while running:
         robot_angle = (robot_angle - 5) % 360
     if keys[pygame.K_RIGHT]:
         robot_angle = (robot_angle + 5) % 360
+
+    if robot_trace[-1] != (robot_x, robot_y):
+        robot_trace.append((robot_x, robot_y))
+    if len(robot_trace) > 500:  # Limit the trace length
+        robot_trace.pop(0)
 
     # Checking for finish
     if finish.collidepoint(robot_x, robot_y):
