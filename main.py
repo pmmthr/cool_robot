@@ -7,6 +7,7 @@ from sensors import get_sensor_values, get_observation
 from maze import init_maze, init_landmarks
 from utils import move_along_wall
 from forward import forward
+from kf import kalman_filter
 
 pygame.init()
 
@@ -20,6 +21,7 @@ entrance = pygame.Rect(50, 250, 10, 100)
 finish = pygame.Rect(730, 250, 10, 100)
 
 robot_trace = [(robot_x, robot_y)]
+sigma = np.eye(2)
 est_x, est_y = 300, 300
 est_trace = [(est_x, est_y)]  
 
@@ -77,7 +79,11 @@ while running:
 
     # Robot movement
     robot_x, robot_y, robot_angle = forward(robot_x, robot_y, robot_angle, keys_mask, robot_speed, maze_walls)
-    
+    observation = get_observation(robot_x, robot_y, robot_angle, landmarks)
+    if observation is not None:
+        z_x, z_y, z_angle = observation
+        est_x, est_y = z_x, z_y
+        est_x, est_y, sigma = kalman_filter((robot_x, robot_y, robot_angle), sigma, robot_speed, (est_x, est_y))
 
     if robot_trace[-1] != (robot_x, robot_y):
         robot_trace.append((robot_x, robot_y))

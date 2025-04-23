@@ -14,5 +14,10 @@ robot_angle = 0  # Initial angle - facing right
 robot_speed = 2
 N_ANGLE_OFFSETS = 8
 
+# standard deviation - motion model
+SR_X, SR_Y, SR_THETA = 0.2, 0.2, 0.1
+# standard deviation - sensor model
+SQ_X, SQ_Y, SQ_THETA = 1, 1, 5
+
 MAX_SENSOR_RANGE = 200
 MAX_HISTORY_SIZE = 500

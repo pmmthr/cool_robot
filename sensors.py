@@ -1,6 +1,6 @@
 from random import shuffle
 import math
-import utils
+from utils import *
 from constants import *
 import numpy as np
 
@@ -20,7 +20,6 @@ def get_sensor_values(robot_x, robot_y, maze_walls):
     return distances
 
 def get_observation(robot_x, robot_y, robot_angle, landmarks):
-    # Uncomment for debug
     # return robot_x, robot_y, robot_angle
 
     close_landmarks = []
