@@ -1,4 +1,5 @@
 import pygame
+from collections import namedtuple
 
 def init_maze():
     # TODO: Here possibly add generation of random maze or maze from the picture
@@ -13,3 +14,10 @@ def init_maze():
     ]
     
     return maze_walls
+
+def init_landmarks():
+    Landmark = namedtuple('Landmark', ['center', 'radius'])
+    points = [(520, 259), (111, 521), (325, 482), (322, 210), (444, 229), (402, 510), (520, 500), (168, 480), (485, 195), (326, 100)]
+
+    landmarks = [Landmark(center=p, radius=10) for p in points]    
+    return landmarks

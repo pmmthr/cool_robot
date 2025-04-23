@@ -3,9 +3,9 @@ import numpy as np
 import pygame
 
 from constants import *
-from maze import init_maze
+from maze import init_maze, init_landmarks
 from utils import move_along_wall
-
+from forward import forward
 
 pygame.init()
 
@@ -15,25 +15,8 @@ pygame.display.set_caption("Robot in Maze Simulation")
 angle_offsets = np.arange(0, 360 + 1, 360//N_ANGLE_OFFSETS) + 90
 sensors_text_offsets = [(np.cos(angle * np.pi / 180), np.sin(angle * np.pi / 180)) for angle in angle_offsets]
 
-
 entrance = pygame.Rect(50, 250, 10, 100)
 finish = pygame.Rect(730, 250, 10, 100)
-
-
-def get_sensor_values(robot_x, robot_y, maze_walls):
-    
-    distances = []
-    for angle_offset in angle_offsets:
-        angle = math.radians(angle_offset)
-        for dist in range(1, MAX_SENSOR_RANGE + 1):
-            sensor_x = robot_x + dist * math.cos(angle)
-            sensor_y = robot_y + dist * math.sin(angle)
-            if any(wall.collidepoint(sensor_x, sensor_y) for wall in maze_walls):
-                distances.append(dist)
-                break
-        else:
-            distances.append(MAX_SENSOR_RANGE)  
-    return distances
 
 robot_trace = [(robot_x, robot_y)]  
 
@@ -41,6 +24,7 @@ running = True
 clock = pygame.time.Clock()
 
 maze_walls = init_maze()
+landmarks = init_landmarks()
 
 while running:
     screen.fill(WHITE)
@@ -48,6 +32,9 @@ while running:
     # Maze drawing
     for wall in maze_walls:
         pygame.draw.rect(screen, BLACK, wall)
+    for landmark in landmarks:
+        pygame.draw.circle(screen, ORANGE, landmark.center, landmark.radius)
+
     pygame.draw.rect(screen, BLUE, entrance)
     pygame.draw.rect(screen, RED, finish)
 
@@ -75,24 +62,16 @@ while running:
             running = False
     
     keys = pygame.key.get_pressed()
-    if keys[pygame.K_UP]:
-        new_x = robot_x + robot_speed * math.cos(math.radians(robot_angle))
-        new_y = robot_y + robot_speed * math.sin(math.radians(robot_angle))
-        if not any(wall.collidepoint(new_x, new_y) for wall in maze_walls):
-            robot_x, robot_y = new_x, new_y
-        else:
-            robot_x, robot_y = move_along_wall(robot_x, robot_y, robot_angle, robot_speed, maze_walls)
-    if keys[pygame.K_DOWN]:
-        new_x = robot_x - robot_speed * math.cos(math.radians(robot_angle))
-        new_y = robot_y - robot_speed * math.sin(math.radians(robot_angle))
-        if not any(wall.collidepoint(new_x, new_y) for wall in maze_walls):
-            robot_x, robot_y = new_x, new_y
-        else:
-            robot_x, robot_y = move_along_wall(robot_x, robot_y, robot_angle, robot_speed, maze_walls)
-    if keys[pygame.K_LEFT]:
-        robot_angle = (robot_angle - 5) % 360
-    if keys[pygame.K_RIGHT]:
-        robot_angle = (robot_angle + 5) % 360
+    keys_mask = [
+        keys[pygame.K_UP], 
+        keys[pygame.K_DOWN],
+        keys[pygame.K_LEFT],
+        keys[pygame.K_RIGHT],
+    ]
+
+    # Robot movement
+    robot_x, robot_y, robot_angle = forward(robot_x, robot_y, robot_angle, robot_speed, maze_walls)
+
 
     if robot_trace[-1] != (robot_x, robot_y):
         robot_trace.append((robot_x, robot_y))
