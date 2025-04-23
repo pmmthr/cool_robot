@@ -16,6 +16,25 @@ def circle_intersection(c1, r1, c2, r2):
     y = y1 + dy * (a / d)
     return (x, y)
 
+def triangulate(c1, r1, c2, r2, c3, r3):
+    (x1, y1), (x2, y2), (x3, y3) = c1, c2, c3
+    A = 2*(x2 - x1)
+    B = 2*(y2 - y1)
+    C = r1*r1 - r2*r2 - x1*x1 + x2*x2 - y1*y1 + y2*y2
+
+    D = 2*(x3 - x1)
+    E = 2*(y3 - y1)
+    F = r1*r1 - r3*r3 - x1*x1 + x3*x3 - y1*y1 + y3*y3
+
+    det = A*E - B*D
+    if abs(det) < 1e-9:         
+        return (0, 0)
+
+    x = (C*E - B*F) / det
+    y = (A*F - C*D) / det
+    return (x, y)
+
+
 def move_along_wall(robot_x, robot_y, robot_angle, robot_speed, maze_walls):
     
     dx = robot_speed * math.cos(math.radians(robot_angle))

@@ -3,9 +3,8 @@ import numpy as np
 import pygame
 
 from constants import *
-from sensors import get_sensor_values, get_observation
-from maze import init_maze, init_landmarks
-from utils import move_along_wall
+from sensors import *
+from maze import *
 from forward import forward
 from kf import kalman_filter
 
@@ -21,8 +20,8 @@ entrance = pygame.Rect(50, 250, 10, 100)
 finish = pygame.Rect(730, 250, 10, 100)
 
 robot_trace = [(robot_x, robot_y)]
-sigma = np.eye(2)
-est_x, est_y = 300, 300
+sigma = np.diag([SR_X**2, SR_Y**2, SR_THETA**2])
+est_x, est_y, est_angle = 300, 300, 0
 est_trace = [(est_x, est_y)]  
 
 running = True
@@ -37,6 +36,7 @@ while running:
     # Maze drawing
     for wall in maze_walls:
         pygame.draw.rect(screen, BLACK, wall)
+    # Landmarks drawing
     for landmark in landmarks:
         pygame.draw.circle(screen, ORANGE, landmark.center, landmark.radius)
 
@@ -56,8 +56,14 @@ while running:
     line_y = robot_y + robot_radius * math.sin(math.radians(robot_angle))
     pygame.draw.line(screen, BLACK, (int(robot_x), int(robot_y)), (int(line_x), int(line_y)), 3)
 
+    # Connected sensor beams
+    close_landmarks = get_hit_landmarks(robot_x, robot_y, landmarks)
+    for l in close_landmarks:
+        l_x, l_y = l.center
+        pygame.draw.line(screen, YELLOW, (int(robot_x), int(robot_y)), (int(l_x), int(l_y)), 1)
+
     # Sensor values
-    sensor_values = get_sensor_values(robot_x, robot_y, maze_walls)
+    sensor_values = get_sensor_values(robot_x, robot_y, maze_walls, landmarks)
     font = pygame.font.SysFont(None, 18)
     for i, value in enumerate(sensor_values):
         text = font.render(str(value), True, BLACK)
@@ -78,12 +84,11 @@ while running:
     ]
 
     # Robot movement
-    robot_x, robot_y, robot_angle = forward(robot_x, robot_y, robot_angle, keys_mask, robot_speed, maze_walls)
+    robot_x, robot_y, robot_angle, mv_flag = forward(robot_x, robot_y, robot_angle, keys_mask, robot_speed, maze_walls)
+    cur_speed = robot_speed if mv_flag else 0
     observation = get_observation(robot_x, robot_y, robot_angle, landmarks)
-    if observation is not None:
-        z_x, z_y, z_angle = observation
-        est_x, est_y = z_x, z_y
-        est_x, est_y, sigma = kalman_filter((robot_x, robot_y, robot_angle), sigma, robot_speed, (est_x, est_y))
+    est, sigma = kalman_filter((est_x, est_y, est_angle), sigma, cur_speed, observation)
+    est_x, est_y, est_angle = est
 
     if robot_trace[-1] != (robot_x, robot_y):
         robot_trace.append((robot_x, robot_y))

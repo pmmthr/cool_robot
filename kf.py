@@ -1,29 +1,30 @@
 import numpy as np
 from constants import *
 
-def kalman_filter(pos, sigma, velocity, obs):
-    r_x, r_y, r_angle = pos
-    mu = np.array([r_x, r_y]).T
+def kalman_filter(est, sigma, velocity, obs):
+    r_x, r_y, r_angle = est
+    mu = np.array([r_x, r_y, r_angle]).T
     u = velocity
-    z_x, z_y = obs
-    z = np.array([z_x, z_y]).T
 
-    A = np.eye(2)
-    B = np.array([np.cos(np.radians(r_angle)), np.sin(np.radians(r_angle))]).T
-
-    sr_x, sr_y, sr_theta = SR_X, SR_Y, SR_THETA
-    sq_x, sq_y, sq_theta = SQ_X, SQ_Y, SQ_THETA
-    R = np.diag([sr_x**2, sr_y**2])
-    Q = np.diag([sq_x**2, sq_y**2])
-
+    A = np.eye(3)
+    B = np.array([np.cos(np.radians(r_angle)), np.sin(np.radians(r_angle)), 0]).T
     mu_pred = A @ mu + B * u
+
+    R = np.diag([SR_X**2, SR_Y**2, SR_THETA**2])
     sigma_pred = A @ sigma @ A.T + R
 
-    C = np.eye(2)
+    C = np.eye(3)
+    Q = np.diag([SQ_X**2, SQ_Y**2, SQ_THETA**2])
     K = sigma_pred @ C.T @ np.linalg.inv(C @ sigma_pred @ C.T + Q)
 
+    if obs == None:
+        mu_pred = np.random.multivariate_normal(mu_pred, sigma_pred, 1)
+        return (mu_pred[0, 0], mu_pred[0, 1], mu_pred[0, 2]), sigma_pred
+    
+    z_x, z_y, z_angle = obs
+    z = np.array([z_x, z_y, z_angle]).T
     mu = mu_pred + K @ (z - C @ mu_pred)
-    sigma = (np.eye(2) - K @ C) @ sigma_pred
+    sigma = (np.eye(3) - K @ C) @ sigma_pred
 
     mu = np.random.multivariate_normal(mu, sigma, 1)
-    return mu[0, 0], mu[0, 1], sigma
+    return (mu[0, 0], mu[0, 1], mu[0, 2]), sigma
