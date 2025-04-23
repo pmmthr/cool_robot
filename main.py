@@ -3,6 +3,7 @@ import numpy as np
 import pygame
 
 from constants import *
+from sensors import get_sensor_values, get_observation
 from maze import init_maze, init_landmarks
 from utils import move_along_wall
 from forward import forward
@@ -18,7 +19,9 @@ sensors_text_offsets = [(np.cos(angle * np.pi / 180), np.sin(angle * np.pi / 180
 entrance = pygame.Rect(50, 250, 10, 100)
 finish = pygame.Rect(730, 250, 10, 100)
 
-robot_trace = [(robot_x, robot_y)]  
+robot_trace = [(robot_x, robot_y)]
+est_x, est_y = 300, 300
+est_trace = [(est_x, est_y)]  
 
 running = True
 clock = pygame.time.Clock()
@@ -41,6 +44,9 @@ while running:
     # Draw robot trace
     for trace_x, trace_y in robot_trace:
         pygame.draw.circle(screen, ORANGE_LIGHT, (int(trace_x), int(trace_y)), 2)
+    # Draw estimated trace
+    for est_trace_x, est_trace_y in est_trace:
+        pygame.draw.circle(screen, BLUE_LIGHT, (int(est_trace_x), int(est_trace_y)), 2)
 
     # Robot drawing
     pygame.draw.circle(screen, ORANGE, (int(robot_x), int(robot_y)), robot_radius)
@@ -70,13 +76,17 @@ while running:
     ]
 
     # Robot movement
-    robot_x, robot_y, robot_angle = forward(robot_x, robot_y, robot_angle, robot_speed, maze_walls)
-
+    robot_x, robot_y, robot_angle = forward(robot_x, robot_y, robot_angle, keys_mask, robot_speed, maze_walls)
+    
 
     if robot_trace[-1] != (robot_x, robot_y):
         robot_trace.append((robot_x, robot_y))
+    if est_trace[-1] != (est_x, est_y):
+        est_trace.append((est_x, est_y))
     if len(robot_trace) > MAX_HISTORY_SIZE:  # Limit the trace length
         robot_trace.pop(0)
+    if len(est_trace) > MAX_HISTORY_SIZE:  # Limit the trace length
+        est_trace.pop(0)
 
     # Checking for finish
     if finish.collidepoint(robot_x, robot_y):

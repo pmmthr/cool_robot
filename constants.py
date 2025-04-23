@@ -6,6 +6,7 @@ RED = (255, 0, 0)
 ORANGE = (255, 100, 0)
 ORANGE_LIGHT = (255, 219, 187)
 BLUE = (0, 0, 255)
+BLUE_LIGHT = (173, 216, 230)
 
 robot_radius = 20
 robot_x, robot_y = 100, 100  # Initial robot position
