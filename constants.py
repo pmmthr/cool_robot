@@ -13,6 +13,12 @@ BLUE = (0, 0, 255)
 GREEN = (0, 255, 0)
 DOTTED_LINE_COLOR = (100, 100, 255)
 
+
+
+MAP_RESOLUTION = 10   # Size of each grid cell in pixels
+
+
+
 robot_radius = 20
 robot_x, robot_y = 100, 100  # Initial robot position
 robot_angle = 0  # Initial angle - facing right

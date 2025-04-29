@@ -3,10 +3,10 @@ import math
 import pygame
 
 
+
 class KalmanFilter:
 
-    # ALL formulas are from the EKF lecture, except for some which are used for normalization
-    
+    # All the formulas are taken from lecture 8, Extended kalman filter slides.
     def __init__(self, initial_state, initial_covariance, motion_noise, meas_noise, sensor_range, features):
         self.state = initial_state  
         self.cov = initial_covariance
@@ -16,111 +16,110 @@ class KalmanFilter:
         self.features = features  
 
     def predict(self, control):
-        v, ω, dt = control
-        x, y, θ = self.state
+        v, w, dt = control
+        x, y, theta = self.state
+        
+        # Avoid division by zero: handle straight-line motion separately (Folie 17, Noise-free Velocity Model)
+        if abs(w) < 1e-6:
+            # Prediction (straight motion) – Slide 17, eq. (1)
+            theta_new = theta
+            x_new = x + v * dt * math.cos(theta)
+            y_new = y + v * dt * math.sin(theta)
 
-        # 1) compute noise-free motion
-        if abs(ω) > 1e-6:
-            r = v / ω
-            θ_new = θ + ω*dt
-            x_new = x - r*math.sin(θ) + r*math.sin(θ_new)
-            y_new = y + r*math.cos(θ) - r*math.cos(θ_new)
-        else:
-            # limit ω→0: straight line
-            θ_new = θ
-            x_new = x + v*dt*math.cos(θ)
-            y_new = y + v*dt*math.sin(θ)
-
-        θ_new = math.atan2(math.sin(θ_new), math.cos(θ_new))
-        self.state = np.array([x_new, y_new, θ_new])
-
-        # 2) compute G = ∂g/∂state
-        if abs(ω) > 1e-6:
+            # Jacobian G = ∂g/∂x for straight motion (linearized) – Slide 17
             G = np.array([
-                [1, 0,
-                r*(-math.cos(θ) + math.cos(θ_new))],
-                [0, 1,
-                r*(-math.sin(θ) + math.sin(θ_new))],
-                [0, 0, 1]
-            ])
-        else:
-            G = np.array([
-                [1, 0, -v*dt*math.sin(θ)],
-                [0, 1,  v*dt*math.cos(θ)],
+                [1, 0, -v * dt * math.sin(theta)],
+                [0, 1,  v * dt * math.cos(theta)],
                 [0, 0, 1]
             ])
 
-        # 3) compute V = ∂g/∂[v,ω]
-        if abs(ω) > 1e-6:
-            θd = θ + ω*dt
+            # Jacobian V = ∂g/∂u for straight motion (linearized) – derived from Slide 17
             V = np.array([
-                [(-math.sin(θ) + math.sin(θd))/ω,
-                v*(math.sin(θ) - math.sin(θd))/(ω**2)
-                + v*dt*math.cos(θd)/ω],
-                [( math.cos(θ) - math.cos(θd))/ω,
-                -v*(math.cos(θ) - math.cos(θd))/(ω**2)
-                + v*dt*math.sin(θd)/ω],
-                [0, dt]
+                [dt * math.cos(theta), -0.5 * v * dt**2 * math.sin(theta)],
+                [dt * math.sin(theta),  0.5 * v * dt**2 * math.cos(theta)],
+                [0,                  dt]
             ])
         else:
+            # Circular motion – Slide 16, eqs. (2-3)
+            r = v / w
+            theta_new = theta + w * dt
+            # Normalize angle
+            theta_new = math.atan2(math.sin(theta_new), math.cos(theta_new))
+            x_new = x - r * math.sin(theta) + r * math.sin(theta_new)
+            y_new = y + r * math.cos(theta) - r * math.cos(theta_new)
+
+            # Jacobian G = ∂g/∂x for circular motion – Slide 16, eq. (G)
+            G = np.array([
+                [1, 0, r * (-math.cos(theta) + math.cos(theta_new))],
+                [0, 1, r * (-math.sin(theta) + math.sin(theta_new))],
+                [0, 0, 1]
+            ])
+
+            # Jacobian V = ∂g/∂u for circular motion – Slide 16, eq. (V)
             V = np.array([
-                [dt*math.cos(θ), -0.5*v*dt*dt*math.sin(θ)],
-                [dt*math.sin(θ),  0.5*v*dt*dt*math.cos(θ)],
+                [(-math.sin(theta) + math.sin(theta_new)) / w,
+                 (v * (math.sin(theta) - math.sin(theta_new))) / (w**2)],
+                [( math.cos(theta) - math.cos(theta_new)) / w,
+                 (-v * (math.cos(theta) - math.cos(theta_new))) / (w**2)],
                 [0, dt]
             ])
 
-        # 4) motion noise
-        α1, α2, α3, α4 = self.motion_noise
+        # Update state
+        self.state = np.array([x_new, y_new, theta_new])
+
+        # Motion noise covariance M – Slide 16, eq. (M)
+        alpha1, alpha2, alpha3, alpha4 = self.motion_noise
         M = np.diag([
-            (α1*abs(v) + α2*abs(ω))**2,
-            (α3*abs(v) + α4*abs(ω))**2
+            (alpha1 * abs(v) + alpha2 * abs(w))**2,
+            (alpha3 * abs(v) + alpha4 * abs(w))**2
         ])
 
-        # 5) covariance prediction
+        # Covariance update – Slide 16, eq. (6)
         self.cov = G @ self.cov @ G.T + V @ M @ V.T
 
         return self.state, self.cov
+
+
 
     def update(self, measurement, feature_id):
         feature_position = self.features[feature_id][1]
         
         dx = feature_position[0] - self.state[0]
         dy = feature_position[1] - self.state[1]
+        
         r2 = dx*dx + dy*dy
         if r2 < 1e-10:
             return self.state, self.cov, np.zeros(2)
 
-        # predicted measurement
-        r   = math.sqrt(r2)
-        phi = math.atan2(dy, dx) - self.state[2]
-        phi = math.atan2(math.sin(phi), math.cos(phi))
-        z_pred = np.array([r, phi])
+        # EQUATION 7 SLIDE 15 EKF
+        r   = math.sqrt(r2) # top of matrix of equation 7 on slide 15 (EKF)
+        phi = math.atan2(dy, dx) - self.state[2] #the bottom of equation 7
+        phi = math.atan2(math.sin(phi), math.cos(phi)) #normalizing
+        z_pred = np.array([r, phi]) #EQUATION 7 EKF slide 15 (zt)
 
-        # measurement Jacobian H (2×3)
+        # Equation 8 slide 15 (Ht). r is with squareroot. r2 is without. top row is with respect to
         H = np.array([
             [-dx / r,  -dy / r, 0 ],
             [ dy / r2, -dx / r2, -1 ]
         ])
 
-        # measurement as range, bearing
         meas_range, meas_bearing = measurement
         z_meas = np.array([meas_range, meas_bearing])
 
-        # innovation
         y = z_meas - z_pred
         y[1] = math.atan2(math.sin(y[1]), math.cos(y[1]))
 
-        # Pred measurement gain
+        # Equation 10 slide 15 EKF: Pred. measurement covariance
         S = H @ self.cov @ H.T + self.meas_noise
-        # gain
+        # Equation 11 slide 15 EKF: Kalman gain
         K = self.cov @ H.T @ np.linalg.inv(S)
 
-        # state update
-        self.state = self.state + K @ y
+        # Equation 12 slide 15 EKF (updated mean)
+        self.state = self.state + K @ y 
 
 
-        # covariance update
         I = np.eye(3)
+        # Equation 13 slide 15 EKF (updated covariance)
         self.cov = (I - K @ H) @ self.cov
 
         return self.state, self.cov, y
