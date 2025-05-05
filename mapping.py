@@ -6,13 +6,14 @@ from constants import *
 
 class Mapping:
 
-    def __init__(self, width, height, resolution):
+    def __init__(self, width, height, resolution,step_factor=0.25):
         # World dimensions (pixels) and cell resolution
         self.width = width
         self.height = height
         self.resolution = resolution
         self.cols = int(math.ceil(width / resolution))
         self.rows = int(math.ceil(height / resolution))
+        self.step_factor = step_factor
 
         # Prior p₀=0.5 and its log-odds l₀ (Eq. 9.7)
         self.p0 = 0.5
@@ -29,7 +30,7 @@ class Mapping:
         # Obstacle thickness alpha (Table 9.2)
         self.alpha = resolution
 
-        # Initialize log-odds grid to prior l₀
+        # Initialize log-odds grid to prior l₀ 
         self.log_odds = np.full((self.rows, self.cols), self.l0, dtype=float)
 
     def world_to_map(self, x, y):
@@ -78,19 +79,19 @@ class Mapping:
             dtheta = abs((theta - self._last_theta + math.pi) % (2*math.pi) - math.pi)
 
             if math.hypot(dx, dy) < (self.resolution * 0.5) and dtheta < math.radians(5):
-                return  # too little motion — skip update
+                return  # too little motion
 
-        # remember for next time
+
+        # cast 360°
         self._last_pose  = pose
         self._last_theta = theta
         x, y = pose
-        # cast 360°
         angles = np.linspace(theta, theta + 2*math.pi, n_beams, endpoint=False)
         
         #loop through each angle beam 
         for ang in angles:
             z = z_max
-            step = self.resolution/2
+            step = self.resolution*self.step_factor  #change step 
             dist = step
             while dist <= z_max:
                 rx = x + dist * math.cos(ang) #rx and ry to get z

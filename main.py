@@ -32,6 +32,8 @@ maze_walls = init_maze()
 landmarks = init_landmarks()
 mapping = Mapping(WIDTH, HEIGHT, MAP_RESOLUTION)
 
+trace_file = open("trace.txt", "w")
+
 while running:
     screen.fill(WHITE)
 
@@ -104,6 +106,8 @@ while running:
         est_trace.pop(0)
     mapping.update_with_scan((robot_x, robot_y), math.radians(robot_angle), MAX_SENSOR_RANGE, maze_walls, close_landmarks)
 
+    trace_file.write(f"{robot_x},{robot_y},{robot_angle}\n")
+
     # Checking for finish
     if finish.collidepoint(robot_x, robot_y):
         print("You reached the finish!")
@@ -114,3 +118,4 @@ while running:
     clock.tick(30)
 
 pygame.quit()
+trace_file.close()

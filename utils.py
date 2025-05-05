@@ -49,3 +49,20 @@ def move_along_wall(robot_x, robot_y, robot_angle, robot_speed, maze_walls):
         robot_y += dy
         
     return robot_x, robot_y
+
+
+
+
+def build_ground_truth(width, height, resolution, walls):
+    rows = int(math.ceil(height / resolution))
+    cols = int(math.ceil(width  / resolution))
+    gt = np.zeros((rows, cols), dtype=int)
+    for r in range(rows):
+        for c in range(cols):
+            x = (c + 0.5) * resolution
+            y = (r + 0.5) * resolution
+            for w in walls:
+                if w.collidepoint(x, y):
+                    gt[r, c] = 1
+                    break
+    return gt
