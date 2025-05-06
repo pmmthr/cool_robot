@@ -1,27 +1,26 @@
-# exp1.py
-
 import math
 import numpy as np
+import matplotlib.pyplot as plt
 
 from constants import WIDTH, HEIGHT, MAX_SENSOR_RANGE
 from mapping   import Mapping
 from maze      import init_maze, init_landmarks
 
-# 1) Only sweep these resolutions
+
 resolutions = [5, 10, 20, 30]
 
-# 2) Load the recorded trajectory
+#  Load the recorded trajectory
 trajectory = []
-with open("trace.txt") as f:
+with open("trace2.txt") as f:
     for line in f:
         x, y, deg = map(float, line.strip().split(","))
         trajectory.append(((x, y), math.radians(deg)))
 
-# 3) Initialize walls & landmarks once
+# initialize walls & landmarks once
 walls     = init_maze()
 landmarks = init_landmarks()
 
-# 4) Build ground truth (walls + landmarks)
+# Build ground truth (walls + landmarks)
 def build_ground_truth(resolution):
     rows = int(math.ceil(HEIGHT / resolution))
     cols = int(math.ceil(WIDTH  / resolution))
@@ -51,31 +50,46 @@ def build_ground_truth(resolution):
 
     return gt
 
-# 5) Numerically stable sigmoid for log-odds → probability
+# logodds to probability
 def sigmoid(l):
     # l is a NumPy array
-    # stable: for l>=0 use 1/(1+exp(-l)), else exp(l)/(1+exp(l))
     out = np.empty_like(l, dtype=float)
     pos = l >= 0
-    neg = ~pos
+    neg = l<0
     out[pos] = 1.0 / (1.0 + np.exp(-l[pos]))
     exp_l   = np.exp(l[neg])
-    out[neg] = exp_l / (1.0 + exp_l)
+    out[neg] = exp_l / (1.0 + exp_l) 
     return out
 
-# 6) Run the sweep and print CSV header
+#get results
 print("resolution_px,mean_abs_error")
+errors=[]
 for res in resolutions:
     mapping = Mapping(WIDTH, HEIGHT, res)
-    gt      = build_ground_truth(res)
+    gt = build_ground_truth(res)
 
     for (x, y), theta in trajectory:
-        mapping.update_with_scan((x, y), theta,
-                                 MAX_SENSOR_RANGE,
-                                 walls, landmarks)
+        mapping.update_with_scan((x, y), theta, MAX_SENSOR_RANGE, walls, landmarks)
 
-    # convert log-odds → probability safely
+    # convert log-odds to probability with sigmoid
     prob = sigmoid(mapping.log_odds)
 
-    error = np.mean(np.abs(prob - gt))
+    # so observed[r,c] is true if its not grey basically (not scanned)
+    observed = (mapping.log_odds != mapping.l0)
+
+    # compute error only on those cells
+    if observed.any():
+        error = np.mean(np.abs(prob[observed] - gt[observed]))
+    else:
+        error = float('nan')
     print(f"{res},{error:.6f}")
+    errors.append(error)
+    
+plt.figure()
+plt.plot(resolutions, errors, marker='o')
+plt.xlabel('Resolution (px per cell)')
+plt.ylabel('Mean Absolute Error')
+plt.title('Mapping Error vs Grid Resolution')
+plt.grid(True)
+plt.tight_layout()
+plt.show()

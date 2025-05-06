@@ -44,6 +44,8 @@ while running:
     # Landmarks drawing
     for landmark in landmarks:
         pygame.draw.circle(screen, ORANGE, landmark.center, landmark.radius)
+        
+    # Mapping on top of maze drawing
     mapping.draw(screen)
 
     pygame.draw.rect(screen, BLUE, entrance)
@@ -81,7 +83,7 @@ while running:
         if event.type == pygame.QUIT:
             running = False
     
-    keys = pygame.key.get_pressed()
+    keys = pygame.key.get_pressed() 
     keys_mask = [
         keys[pygame.K_UP], 
         keys[pygame.K_DOWN],
@@ -104,6 +106,8 @@ while running:
         robot_trace.pop(0)
     if len(est_trace) > MAX_HISTORY_SIZE:  # Limit the trace length
         est_trace.pop(0)
+        
+    # Update map
     mapping.update_with_scan((robot_x, robot_y), math.radians(robot_angle), MAX_SENSOR_RANGE, maze_walls, close_landmarks)
 
     trace_file.write(f"{robot_x},{robot_y},{robot_angle}\n")

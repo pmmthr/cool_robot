@@ -7,15 +7,14 @@ from constants import *
 class Mapping:
 
     def __init__(self, width, height, resolution,step_factor=0.25):
-        # World dimensions (pixels) and cell resolution
         self.width = width
         self.height = height
         self.resolution = resolution
-        self.cols = int(math.ceil(width / resolution))
-        self.rows = int(math.ceil(height / resolution))
+        self.cols = math.ceil(width / resolution)
+        self.rows = math.ceil(height / resolution)
         self.step_factor = step_factor
 
-        # Prior p₀=0.5 and its log-odds l₀ (Eq. 9.7)
+        # Prior p=0.5 and its log-odds l (Eq. 9.7)
         self.p0 = 0.5
         self.l0 = math.log(self.p0 / (1 - self.p0))
 
@@ -30,7 +29,7 @@ class Mapping:
         # Obstacle thickness alpha (Table 9.2)
         self.alpha = resolution
 
-        # Initialize log-odds grid to prior l₀ 
+        # initialize log odds (all l0 in beginning then they get updated based on sensor)
         self.log_odds = np.full((self.rows, self.cols), self.l0, dtype=float)
 
     def world_to_map(self, x, y):
@@ -45,10 +44,10 @@ class Mapping:
     def inverse_sensor_model(self, row, col, pose, z, z_max):
         """
         Three cases from Table 9.2:
-          1) r > min(z_max, z + α/2)   -> last p0
-          2) z < z_max and |r−z|<α/2    -> p_occ
-          3) r ≤ z                    -> p_free
-          else                         -> p0
+          1) r > min(z_max, z + alpha/2)   then last po
+          2) z < z_max and |r−z|<alpha/2    then p_occ
+          3) r ≤ z                    then  p_free
+          else                         then last p0
         """
         # world coords of cell center
         x_c, y_c = self.map_to_world(row, col)
@@ -65,10 +64,10 @@ class Mapping:
         # CASE 3: free cells before obstacle (line 10)
         if r <= z:
             return self.p_free
-        # fallback to prior
+        # final fallback to prior
         return self.p0
 
-    def update_with_scan(self, pose, theta, z_max, walls, landmarks, n_beams=100):
+    def update_with_scan(self, pose, theta, z_max, walls, landmarks, n_beams=8):
         """
         Bayes update (Eq. 9.5, Table 9.1): (line 4)
         """
@@ -76,17 +75,15 @@ class Mapping:
         if self._last_pose is not None:
             dx = pose[0] - self._last_pose[0]
             dy = pose[1] - self._last_pose[1]
-            dtheta = abs((theta - self._last_theta + math.pi) % (2*math.pi) - math.pi)
-
+            angle_diff = theta - self._last_theta 
+            dtheta = abs(math.atan2(math.sin(angle_diff), math.cos(angle_diff)))
             if math.hypot(dx, dy) < (self.resolution * 0.5) and dtheta < math.radians(5):
                 return  # too little motion
-
-
-        # cast 360°
+            
         self._last_pose  = pose
         self._last_theta = theta
         x, y = pose
-        angles = np.linspace(theta, theta + 2*math.pi, n_beams, endpoint=False)
+        angles = np.linspace(theta, theta + 2*math.pi, n_beams, endpoint=False) #circle sensor (with 360 degrees)
         
         #loop through each angle beam 
         for ang in angles:
@@ -120,8 +117,6 @@ class Mapping:
             max_steps = int(math.ceil(z_max / self.resolution))
             for k in range(max_steps+1):
                 r_k = k * self.resolution
-                if r_k > z_max:
-                    break
                 cx = x + r_k * math.cos(ang) #cx and cy are the grid cells along the specific beam we have calculated (z)
                 cy = y + r_k * math.sin(ang)
                 row, col = self.world_to_map(cx, cy)

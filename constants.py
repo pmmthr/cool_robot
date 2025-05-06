@@ -15,7 +15,7 @@ robot_angle = 0  # Initial angle - facing right
 robot_speed = 2
 N_ANGLE_OFFSETS = 8
 
-MAP_RESOLUTION = 5   #  MAPPING
+MAP_RESOLUTION = 7   #  MAPPING
 
 # standard deviation - motion model
 SR_X, SR_Y, SR_THETA = 0.2, 0.2, 0.005
