@@ -84,8 +84,11 @@ class KalmanFilter:
     def update(self, measurement, feature_id):
         feature_position = self.features[feature_id][1]
         
-        dx = feature_position[0] - self.state[0]
-        dy = feature_position[1] - self.state[1]
+        _, landmark = self.features[feature_id]
+        fx, fy     = float(landmark.center[0]), float(landmark.center[1])
+        
+        dx = fx - self.state[0]
+        dy = fy - self.state[1]
         
         r2 = dx*dx + dy*dy
         if r2 < 1e-10:
@@ -124,17 +127,29 @@ class KalmanFilter:
 
         return self.state, self.cov, y
 
-    def detect_features(self, robot_position, robot_angle):
-        detected_features = []
-        for fid, feature in self.features:
-            dx = feature[0] - robot_position[0]
-            dy = feature[1] - robot_position[1]
-            distance = math.sqrt(dx**2 + dy**2)
+    def detect_features(self, features, robot_position, robot_angle):
+        """
+        features: list of (fid, Landmark), where Landmark has .center=(fx,fy) and .radius
+        robot_position: (rx, ry)
+        robot_angle: heading in radians
+        """
+        detected = []
+        rx, ry = robot_position
+
+        for fid, landmark in features:
+            fx, fy = landmark.center
+            # Vector from robot to landmark center
+            dx = fx - rx
+            dy = fy - ry
+            distance = math.hypot(dx, dy)
             if distance <= self.sensor_range:
-                bearing = math.atan2(dy, dx) - robot_angle
-                bearing = math.atan2(math.sin(bearing), math.cos(bearing))  # normalize
-                detected_features.append((fid, feature, bearing, distance))
-        return detected_features
+                raw_bearing = math.atan2(dy, dx) - robot_angle
+                bearing = math.atan2(math.sin(raw_bearing),
+                                    math.cos(raw_bearing))
+
+                detected.append((fid, (fx, fy), bearing, distance))
+
+        return detected
 
     def draw_covariance_ellipse(self, screen, color=(0, 255, 0), scale=50.0):
 
@@ -158,3 +173,34 @@ class KalmanFilter:
         end_x = position[0] + major_axis / 2 * math.cos(math.radians(angle))
         end_y = position[1] + major_axis / 2 * math.sin(math.radians(angle))
         pygame.draw.line(screen, color, position, (end_x, end_y), 1)
+
+
+    def draw_dotted_line(screen, start, end, color, step=10):
+        """
+        Draw a dashed line from start to end.
+        Aborts early if the distance is NaN/Inf or too small.
+        """
+        x1, y1 = start
+        x2, y2 = end
+        dx, dy = x2 - x1, y2 - y1
+        distance = math.hypot(dx, dy)
+        
+
+        # Bail out if distance is not a finite number or is essentially zero
+        if not math.isfinite(distance) or distance < 1e-6:
+            return
+
+        ux, uy = dx / distance, dy / distance
+        dash = step
+        gap = step
+
+        pos = 0.0
+        while pos < distance:
+            start_pos = pos
+            end_pos = min(pos + dash, distance)
+
+            p1 = (int(x1 + ux * start_pos), int(y1 + uy * start_pos))
+            p2 = (int(x1 + ux * end_pos),   int(y1 + uy * end_pos))
+            pygame.draw.line(screen, color, p1, p2, 1)
+
+            pos += dash + gap
