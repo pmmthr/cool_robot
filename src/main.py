@@ -6,8 +6,10 @@ import pygame
 from constants import *
 from kalman_filter import KalmanFilter
 from maze import init_landmarks, init_maze
-from utils import move_along_wall
+from utils import move_along_wall, a_star
+from genetic_algorithm import genetic_algorithm
 from mapping import Mapping
+
 
 # Initialize Pygame
 
@@ -63,6 +65,12 @@ maze_walls = init_maze()
 landmarks = init_landmarks()
 #mapping = Mapping(WIDTH, HEIGHT, MAP_RESOLUTION)
 
+finish_state = (finish.centerx, finish.centery)
+shortest_path = genetic_algorithm(INITIAL_STATE, finish_state, maze_walls,
+                                  population_size=200, generations=1000)
+if shortest_path is None:
+    print("No path found!")
+
 trace_file = open("trace.txt", "w")
 
 kf = KalmanFilter(INITIAL_STATE.copy(), INITIAL_COVARIANCE.copy(), MOTION_NOISE, MEASUREMENT_NOISE, MAX_SENSOR_RANGE, landmarks)
@@ -96,6 +104,10 @@ while running:
         screen.blit(text, (robot_x + (1.5*robot_radius)*text_offset_x - 5, robot_y + (1.5*robot_radius)*text_offset_y - 5)) # yes weird hardcoding but for alignment
 
     
+    for waypoint in shortest_path:
+        # print(waypoint)
+        robot_x_path, robot_y_path = waypoint
+        pygame.draw.circle(screen, BLUE, (int(robot_x_path), int(robot_y_path)), 5)
 
     v=0.0
     w=0.0
