@@ -6,10 +6,9 @@ import pygame
 from constants import *
 from kalman_filter import KalmanFilter
 from maze import init_landmarks, init_maze
-from utils import move_along_wall
-from genetic_algorithm import *
+from utils import move_along_wall, a_star
+from genetic_algorithm import genetic_algorithm
 from mapping import Mapping
-
 
 
 # Initialize Pygame
@@ -19,19 +18,11 @@ pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Robot in Maze Simulation")
 
-screen.fill(WHITE)
-pygame.display.flip()
-pygame.event.pump()
-finish = pygame.Rect(730, 250, 10, 100)
-
-
-entrance = pygame.Rect(50, 250, 10, 100)
-
-    
 angle_offsets = np.arange(0, 360 + 1, 360//N_ANGLE_OFFSETS) + 90
 sensors_text_offsets = [(np.cos(angle * np.pi / 180), np.sin(angle * np.pi / 180)) for angle in angle_offsets]
 
 entrance = pygame.Rect(50, 250, 10, 100)
+finish = pygame.Rect(730, 250, 10, 100)
 
 
 # Robot state
@@ -42,29 +33,12 @@ robot_trace = [(robot_x, robot_y)]
 
 est_x, est_y= robot_x, robot_y
 est_trace = [(est_x, est_y)]
-finish_state = (finish.centerx, finish.centery)
-
-raw_path = genetic_algorithm(
-    INITIAL_STATE[:2],      # only x,y
-    finish_state,
-    init_maze(),
-    population_size=50,
-    generations=100,
-    genome_length=4        # e.g. evolve 8 intermediate waypoints
-)
-
-if not raw_path:
-    print("No path found!")
-    shortest_path = []
-else:
-    print("oh")
-    # 2) prune it down to at most N waypoints
-    shortest_path = limit_waypoints(raw_path, max_points=10)
-    print("yay")
 
 
-path_index = 0
-waypoint_threshold = 5.0
+
+entrance = pygame.Rect(50, 250, 10, 100)
+
+
 
 # Get sensor readings
 def get_sensor_values(x, y, walls):
@@ -84,20 +58,18 @@ def get_sensor_values(x, y, walls):
 running = True
 clock = pygame.time.Clock()
 
+finish = pygame.Rect(730, 250, 10, 100)
 
 
-# Waypoint tracking
-path_index = 0
-waypoint_threshold = 5.0
-
-# Compute path via evolutionary/nav algorithm
-
-    
 maze_walls = init_maze()
 landmarks = init_landmarks()
 #mapping = Mapping(WIDTH, HEIGHT, MAP_RESOLUTION)
 
- 
+finish_state = (finish.centerx, finish.centery)
+shortest_path = genetic_algorithm(INITIAL_STATE, finish_state, maze_walls,
+                                  population_size=200, generations=1000)
+if shortest_path is None:
+    print("No path found!")
 
 trace_file = open("trace.txt", "w")
 
@@ -121,8 +93,7 @@ while running:
     # Mapping on top of maze drawing
     #mapping.draw(screen)
     pygame.draw.rect(screen, RED, finish)
-    for wx, wy in shortest_path:
-        pygame.draw.circle(screen, BLUE, (int(wx), int(wy)), 5)
+
 
     # Sensor values
     sensor_values = get_sensor_values(robot_x, robot_y, maze_walls)
@@ -132,34 +103,49 @@ while running:
         text_offset_x, text_offset_y = sensors_text_offsets[i]
         screen.blit(text, (robot_x + (1.5*robot_radius)*text_offset_x - 5, robot_y + (1.5*robot_radius)*text_offset_y - 5)) # yes weird hardcoding but for alignment
 
-
-    
-    # Navigation control
     if shortest_path:
-        for wx,wy in shortest_path:
-            # print(waypoint)
-            pygame.draw.circle(screen, BLUE, (int(wx), int(wy)), 5)
-        
-        tx, ty = shortest_path[path_index]
-        dx, dy = tx - robot_x, ty - robot_y
-        dist = math.hypot(dx, dy)
-        if dist < waypoint_threshold and path_index < len(shortest_path)-1:
-            path_index += 1
-        else:
-            desired = math.degrees(math.atan2(dy, dx))
-            diff = (desired - robot_angle + 180) % 360 - 180
-            v = max(-robot_speed, min(robot_speed, dist * 1.0))
-            w = max(-math.radians(90), min(math.radians(90), math.radians(diff * 2.0)))
-            # Move robot
-            nx = robot_x + v*dt*math.cos(math.radians(robot_angle))
-            ny = robot_y + v*dt*math.sin(math.radians(robot_angle))
-            if any(wall.collidepoint(nx, ny) for wall in maze_walls):
-                robot_x, robot_y = move_along_wall(robot_x, robot_y, robot_angle, v, maze_walls, dt)
-            else:
-                robot_x, robot_y = nx, ny
-            robot_angle = (robot_angle + math.degrees(w*dt)) % 360
+        for waypoint in shortest_path:
+            print("omg",waypoint)
+            robot_x_path, robot_y_path = waypoint
+            pygame.draw.circle(screen, BLUE, (int(robot_x_path), int(robot_y_path)), 5)
     else:
-        v, w = 0.0, 0.0
+        v=0.0
+        w=0.0
+        # --- Event handling ---
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_UP]:
+            new_x = robot_x + robot_speed *dt* math.cos(math.radians(robot_angle))
+            new_y = robot_y + robot_speed *dt* math.sin(math.radians(robot_angle))
+            v = robot_speed
+
+            
+            if not any(wall.collidepoint(new_x, new_y) for wall in maze_walls):
+                robot_x, robot_y = new_x, new_y
+            else:
+                robot_x, robot_y = move_along_wall(robot_x, robot_y, robot_angle, robot_speed, maze_walls,dt)
+                
+        if keys[pygame.K_DOWN]:
+            new_x = robot_x - robot_speed *dt* math.cos(math.radians(robot_angle))
+            new_y = robot_y - robot_speed *dt* math.sin(math.radians(robot_angle))
+            v = - robot_speed
+
+            if not any(wall.collidepoint(new_x, new_y) for wall in maze_walls):
+                robot_x, robot_y = new_x, new_y
+            else:
+                robot_x, robot_y = move_along_wall(robot_x, robot_y, robot_angle, robot_speed, maze_walls,dt)
+                
+        if keys[pygame.K_LEFT]:
+            robot_angle = (robot_angle - 5) % 360
+            w = -math.radians(90)
+
+        if keys[pygame.K_RIGHT]:
+            robot_angle = (robot_angle + 5) % 360
+            w = math.radians(90)
+
 
 
     # Kalman Filter Predict Step 
@@ -216,7 +202,7 @@ while running:
     if math.isfinite(est_x) and math.isfinite(est_y):
         pygame.draw.circle(screen, DOTTED_LINE_COLOR,(int(est_x), int(est_y)),robot_radius, 1)
 
-   #     kf.draw_covariance_ellipse(screen)
+        kf.draw_covariance_ellipse(screen)
 
     # --- Check if robot reached finish ---
     if finish.collidepoint(robot_x, robot_y):
@@ -227,8 +213,6 @@ while running:
     trace_file.write(f"{robot_x},{robot_y},{robot_angle}\n")
 
     pygame.display.flip()
-    
-
 
 
 pygame.quit()

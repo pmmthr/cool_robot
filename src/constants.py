@@ -18,13 +18,14 @@ DOTTED_LINE_COLOR = (100, 100, 255)
 
 
 MAP_RESOLUTION = 10   # Size of each grid cell in pixels
+MAX_STEPS = 500
 
 
 
 robot_radius = 20
 robot_x, robot_y = 100, 100  # Initial robot position
 robot_angle = 0  # Initial angle - facing right
-robot_speed = 70
+robot_speed = 150
 N_ANGLE_OFFSETS = 8
 
 MAX_SENSOR_RANGE = 100
